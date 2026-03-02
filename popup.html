@@ -1,0 +1,398 @@
+<!DOCTYPE html>
+<html lang="en">
+
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>TOTP Authenticator</title>
+  <script src="otpauth/otpauth.umd.min.js"></script>
+  <style>
+    @import url('https://fonts.googleapis.com/css2?family=DM+Mono:ital,wght@0,300;0,400;0,500;1,300;1,400;1,500&display=swap');
+
+    * {
+      margin: 0;
+      padding: 0;
+      box-sizing: border-box;
+    }
+
+    :root {
+      --bg: #0a0a14;
+      --surface: #0f0f1e;
+      --surface2: #141428;
+      --cyan: #00d4ff;
+      --cyan-dim: #00d4ff44;
+      --green: #00ff88;
+      --red: #ff4466;
+      --amber: #ffaa00;
+      --text: #c8d8e8;
+      --text-dim: #5a6a7a;
+      --border: #1e2a3a;
+      --mono: 'DM Mono', monospace;
+      --sans: 'DM Mono', sans-serif;
+    }
+
+    body {
+      width: 340px;
+      min-height: 400px;
+      background: var(--bg);
+      color: var(--text);
+      font-family: var(--sans);
+      overflow-x: hidden;
+    }
+
+    /* Header */
+    .header {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      padding: 16px 18px 12px;
+      border-bottom: 1px solid var(--border);
+      background: linear-gradient(180deg, #0d0d1f 0%, var(--bg) 100%);
+    }
+
+    .logo {
+      display: flex;
+      align-items: center;
+      gap: 10px;
+    }
+
+    .logo-icon {
+      width: 28px;
+      height: 28px;
+      background: linear-gradient(135deg, var(--cyan), #0066ff);
+      border-radius: 6px;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      font-size: 14px;
+      box-shadow: 0 0 12px var(--cyan-dim);
+    }
+
+    .logo-text {
+      font-family: var(--sans);
+      font-weight: 700;
+      font-size: 16px;
+      letter-spacing: 2px;
+      color: var(--cyan);
+      text-transform: uppercase;
+    }
+
+    .logo-sub {
+      font-family: var(--mono);
+      font-size: 9px;
+      color: var(--text-dim);
+      letter-spacing: 1px;
+    }
+
+    /* Scan Button */
+    .scan-btn {
+      display: flex;
+      align-items: center;
+      gap: 8px;
+      background: transparent;
+      border: 1px solid var(--cyan);
+      color: var(--cyan);
+      padding: 8px 14px;
+      border-radius: 6px;
+      font-family: var(--sans);
+      font-size: 12px;
+      font-weight: 600;
+      letter-spacing: 1.5px;
+      text-transform: uppercase;
+      cursor: pointer;
+      transition: all 0.2s;
+      width: 100%;
+      margin: 0;
+      justify-content: center;
+    }
+
+    .scan-btn:hover {
+      background: var(--cyan-dim);
+      box-shadow: 0 0 16px var(--cyan-dim);
+    }
+
+    .scan-btn:active {
+      transform: scale(0.97);
+    }
+
+    .scan-btn.loading {
+      opacity: 0.6;
+      cursor: wait;
+    }
+
+    /* Actions bar */
+    .actions {
+      padding: 12px 18px;
+      border-bottom: 1px solid var(--border);
+    }
+
+    /* Empty state */
+    .empty-state {
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      justify-content: center;
+      padding: 40px 20px;
+      gap: 12px;
+      color: var(--text-dim);
+    }
+
+    .empty-icon {
+      font-size: 36px;
+      opacity: 0.4;
+    }
+
+    .empty-text {
+      font-size: 14px;
+      letter-spacing: 1px;
+      text-align: center;
+      line-height: 1.6;
+    }
+
+    /* Account list  */
+    .accounts {
+      padding: 8px 0;
+    }
+
+    .account-card {
+      padding: 14px 18px;
+      border-bottom: 1px solid var(--border);
+      position: relative;
+      transition: background 0.15s;
+    }
+
+    .account-card:hover {
+      background: var(--surface);
+    }
+
+    .account-card:last-child {
+      border-bottom: none;
+    }
+
+    .account-issuer {
+      font-size: 10px;
+      letter-spacing: 2px;
+      color: var(--text-dim);
+      text-transform: uppercase;
+      margin-bottom: 2px;
+      font-family: var(--mono);
+    }
+
+    .account-label {
+      font-size: 13px;
+      color: var(--text);
+      margin-bottom: 10px;
+      font-weight: 400;
+    }
+
+    .code-row {
+      display: flex;
+      align-items: center;
+      gap: 12px;
+    }
+
+    .code-display {
+      font-family: var(--mono);
+      font-size: 28px;
+      letter-spacing: 6px;
+      color: var(--green);
+      text-shadow: 0 0 16px #00ff8855;
+      cursor: pointer;
+      transition: opacity 0.15s;
+      flex: 1;
+    }
+
+    .code-display:hover {
+      opacity: 0.8;
+    }
+
+    .code-display.expired {
+      color: var(--amber);
+      text-shadow: 0 0 16px #ffaa0055;
+    }
+
+    /* Progress ring */
+    .progress-ring-wrap {
+      position: relative;
+      width: 36px;
+      height: 36px;
+      flex-shrink: 0;
+    }
+
+    .progress-ring {
+      transform: rotate(-90deg);
+    }
+
+    .progress-track {
+      fill: none;
+      stroke: var(--surface2);
+      stroke-width: 3;
+    }
+
+    .progress-bar {
+      fill: none;
+      stroke: var(--green);
+      stroke-width: 3;
+      stroke-linecap: round;
+      transition: stroke-dashoffset 1s linear, stroke 0.3s;
+    }
+
+    .progress-bar.expired {
+      stroke: var(--amber);
+    }
+
+    .progress-seconds {
+      position: absolute;
+      top: 50%;
+      left: 50%;
+      transform: translate(-50%, -50%);
+      font-family: var(--mono);
+      font-size: 10px;
+      color: var(--text-dim);
+    }
+
+    /* Delete button */
+    .delete-btn {
+      position: absolute;
+      top: 12px;
+      right: 14px;
+      background: none;
+      border: none;
+      color: var(--text-dim);
+      cursor: pointer;
+      font-size: 14px;
+      opacity: 0;
+      transition: opacity 0.15s, color 0.15s;
+      padding: 4px;
+    }
+
+    .account-card:hover .delete-btn {
+      opacity: 1;
+    }
+
+    .delete-btn:hover {
+      color: var(--red);
+    }
+
+    /* Copy toast */
+    .copy-toast {
+      position: fixed;
+      bottom: 16px;
+      left: 50%;
+      transform: translateX(-50%) translateY(20px);
+      background: var(--green);
+      color: #000;
+      font-family: var(--mono);
+      font-size: 11px;
+      padding: 6px 16px;
+      border-radius: 20px;
+      opacity: 0;
+      transition: all 0.25s;
+      pointer-events: none;
+      letter-spacing: 1px;
+      font-weight: bold;
+    }
+
+    .copy-toast.show {
+      opacity: 1;
+      transform: translateX(-50%) translateY(0);
+    }
+
+    /* Status bar */
+    .status-bar {
+      padding: 6px 18px;
+      font-family: var(--mono);
+      font-size: 10px;
+      color: var(--text-dim);
+      border-top: 1px solid var(--border);
+      display: flex;
+      align-items: center;
+      gap: 6px;
+    }
+
+    .status-dot {
+      width: 6px;
+      height: 6px;
+      border-radius: 50%;
+      background: var(--green);
+      animation: pulse 2s infinite;
+    }
+
+    @keyframes pulse {
+
+      0%,
+      100% {
+        opacity: 1;
+      }
+
+      50% {
+        opacity: 0.3;
+      }
+    }
+
+    /* Scan instruction overlay */
+    .scan-overlay-msg {
+      display: none;
+      padding: 20px 18px;
+      text-align: center;
+      color: var(--cyan);
+      font-family: var(--mono);
+      font-size: 12px;
+      line-height: 1.8;
+      background: var(--surface);
+      border: 1px solid var(--cyan-dim);
+      margin: 12px 18px;
+      border-radius: 8px;
+    }
+
+    .scan-overlay-msg.show {
+      display: block;
+    }
+
+    #msg-text {
+      font-weight: bolder;
+      color: var(--text);
+    }
+  </style>
+</head>
+
+<body>
+
+  <div class="header">
+    <div class="logo">
+      <div class="logo-icon">🔐</div>
+      <div>
+        <div class="logo-text">2FA Authenticator</div>
+        <!-- <div class="logo-sub">AUTHENTICATOR</div> -->
+      </div>
+    </div>
+  </div>
+
+  <div class="actions">
+    <button class="scan-btn" id="scanBtn">
+      <span>▦</span>
+      <span>SCAN QR CODE</span>
+    </button>
+  </div>
+
+  <div class="scan-overlay-msg" id="scanMsg">
+    📸 Scanner active on page<br>
+    <strong>Drag to select the QR code area</strong><br>
+    <span style="color: var(--text-dim); font-size: 10px;">Press ESC to cancel</span>
+  </div>
+
+
+  <div class="status-bar">
+    <span id="msg-text">Click On Code To Copy</span>
+  </div>
+  <div id="accountsContainer">
+    <!-- Filled by JS -->
+  </div>
+
+  <div class="copy-toast" id="copyToast">COPIED!</div>
+
+  <script src="totp.js"></script>
+  <script src="popup.js"></script>
+</body>
+
+</html>
